@@ -1,0 +1,10 @@
+		  #include<reg51.h>
+		  main()
+		  {TMOD=0x20;
+		  TH1=0XFD;
+		  SCON=0x50;
+		  TR1=1;
+		  SBUF='A';
+		  while(TI==0);
+		  TI=0;
+		  }
