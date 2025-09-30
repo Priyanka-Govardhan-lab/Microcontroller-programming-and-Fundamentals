@@ -1,0 +1,67 @@
+#include<lpc17xx.h>
+int data;
+
+void pll()
+{
+LPC_SC->SCS=(1<<5);
+while ((LPC_SC->SCS& (1<<6))==0);
+LPC_SC->CLKSRCSEL=(1<<0);
+LPC_SC->PLL0CON=(1<<0);
+LPC_SC->PLL0CFG=(14<<0);
+LPC_SC->PLL0FEED=0XAA;
+LPC_SC->PLL0FEED=0X55;
+LPC_SC->CCLKCFG=(5<<0);
+while ((LPC_SC->PLL0STAT&(1<<26))==0);
+LPC_SC->PLL0CON|=(1<<1);
+LPC_SC->PLL0FEED=0XAA;
+LPC_SC->PLL0FEED=0X55;		                                                                 
+
+}
+
+void uart_init()
+{
+LPC_SC->PCONP|=(1<<3);
+LPC_PINCON->PINSEL0|=(1<<4)|(1<<6);
+LPC_UART0->LCR=(0X03<<0)|(1<<7);
+LPC_UART0->DLL=97;
+LPC_UART0->DLM=0;
+LPC_UART0->LCR &= ~(1<<7);
+}
+
+void tx()
+{
+while ((LPC_UART0->LSR&(1<<5))==0);
+LPC_UART0->THR = data;
+}
+
+void i2c_init()
+{
+LPC_SC->PCONP|=(1<<26);
+LPC_PINCON->PINSEL0|=(1<<21)|(1<<23);//SELECT SCL2,SDA2 OF I2C2
+LPC_PINCON->PINMODE0=(1<<21)|(1<<23); //NEITHER PULL-UP/PULL-DOWN
+LPC_PINCON->PINMODE_OD0=(1<<10)|(1<<11); //OPEN DRAIN CONFIG FOR PINS P0.10, P0.11
+LPC_SC->PCLKSEL1=(1<<21); // CHOOSE PERIPHERAL CLK AS CCLK/2=30MHz
+LPC_I2C2->I2SCLH = 150;
+LPC_I2C2->I2SCLL= 150;
+}
+
+int main()
+{
+pll();
+uart_init();
+i2c_init();
+
+LPC_I2C2->I2ADR0 =0XF0;
+LPC_I2C2->I2CONSET=(1<<2)|(1<<6); //ENABLE I2C & AA BIT
+while (LPC_I2C2->I2STAT!=0X60); //POLL FOR ADDR AND R/W BIT RECEIVED
+LPC_I2C2->I2CONCLR=(1<<3);	//CLEAR SI FLAG
+while (LPC_I2C2->I2STAT!=0X80); //POLL FOR DATA RECEIVED
+LPC_I2C2->I2CONCLR=(1<<3);	//CLEAR SI FLAG
+data = LPC_I2C2-> I2DAT;  //COPY RCEIVED DATA TO VARIABLE
+tx();	 //TX TO UART
+while (LPC_I2C2->I2STAT!=0XA0);	//POLL FOR STOP BIT
+LPC_I2C2->I2CONCLR= 0;	
+while(1);
+return 0;
+
+}
